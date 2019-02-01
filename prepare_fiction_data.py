@@ -33,20 +33,25 @@ def clean_string(string):
     #new_string = string.split('\n')[1][7:]
     return new_string
 
-def get_answers(answers):
+def get_answers(answers, id, type):
     result = []
     for answer in answers:
         answer_dict = {}
-        answer_dict['id'] = answer['id']
-        answer_dict['text'] = clean_string(answer.text)
+        answer_dict['id'] = "{}_{}".format(id, answer['id'])
+        #answer_dict['text'] = clean_string(answer.text)
+        answer_dict['text'] = ""
+        if type == "Unanswerable":
+            answer_dict["answer_start"] = -1
+        else:
+            answer_dict["answer_start"] = 0
         result.append(answer_dict)
     return result
 
-def get_qas(text):
+def get_qas(text, id):
     qas = []
     for question in text:
         question_dict = {}
-        question_dict["id"] = str(question["id"])
+        question_dict["id"] = "{}_{}".format(id, str(question["id"]))
         question_dict["type"] = question["type"]
         question_dict["question"] = clean_string(str(question.next_element))
 
@@ -54,18 +59,24 @@ def get_qas(text):
 
         if question_dict["type"] == "Unanswerable":
             question_dict["is_impossible"] = True
-            question_dict["plausible_answers"] = get_answers(answers[:3])
+            question_dict["plausible_answers"] = get_answers(answers[:3],
+                question_dict["id"], question_dict["type"])
+            question_dict["answers"] = []
+
         else:
             question_dict["is_impossible"] = False
-            question_dict["plausible_answers"] = get_answers(answers[1:3])
-            question_dict["answers"] = get_answers([answers[0]])
+            question_dict["plausible_answers"] = get_answers(answers[1:3],
+                question_dict["id"], question_dict["type"])
+            question_dict["answers"] = get_answers([answers[0]],
+                 question_dict["id"], question_dict["type"])
+
         qas.append(question_dict)
     return qas
 
 
-def get_paragraph(text):
+def get_paragraph(text, id):
     paragraph = {}
-    paragraph["qas"] = get_qas(text.find_all("q"))
+    paragraph["qas"] = get_qas(text.find_all("q"), id)
     paragraph["context"] = clean_string(text.find("text_body").text)
     return paragraph
 
@@ -77,13 +88,13 @@ def xml2list(texts):
         text_data["author"] = clean_string(text.find("author").text)
         text_data["title"] = clean_string(text.find("title").text)
         text_data["url"] = clean_string(text.find("url").text)
-        text_data["paragraphs"] = [get_paragraph(text)]
+        text_data["paragraphs"] = [get_paragraph(text, text_data["text_id"])]
         dataset.append(text_data)
     return dataset
 
 def main():
     project_file = os.getcwd()
-    version = '0'
+    version = '2'
     xml_dataset = "{}/fiction.xml".format(project_file)
     output_dir = "{}/fiction_reformatted_{}".format(project_file, version)
 
@@ -93,7 +104,7 @@ def main():
     texts = soup.find_all('text')
     dataset = xml2list(texts)
 
-    make_datasets(dataset, output_dir, .85, version)
+    make_datasets(dataset, output_dir, 0, version)
 
 
 
